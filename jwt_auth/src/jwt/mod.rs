@@ -6,5 +6,6 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/.
  */
 
-pub mod jwt;
-pub mod keys;
+pub mod token_producer;
+
+pub use token_producer::TokenProducer;
