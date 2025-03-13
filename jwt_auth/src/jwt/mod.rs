@@ -7,5 +7,7 @@
  */
 
 pub mod token_producer;
+mod token_verifier;
 
 pub use token_producer::TokenProducer;
+pub use token_verifier::TokenVerifier;
