@@ -14,21 +14,17 @@ use rocket::{
 use rocket_okapi::gen::OpenApiGenerator;
 use rocket_okapi::okapi::openapi3::{Object, SecurityRequirement, SecurityScheme, SecuritySchemeData};
 use rocket_okapi::request::{OpenApiFromRequest, RequestHeaderInput};
+use sea_orm::{prelude::*, ActiveValue::Set};
 use jwt_auth::jwt::TokenVerifier;
 use crate::routes::ApiError;
+use crate::fairings::auth_cache::TokenInfo;
 
 /// Request Guard for authentication. It investigates the Authorization HTTP header
 /// for a valid JWT. It looks up the user according to the Issuer and Subject fields
 /// in the database or creates a new user if there is no hit.
 pub struct Auth {
-    pub issuer: String,
-    pub subject: String,
-}
-
-/// JWT information
-struct TokenInfo {
-    pub issuer: String,
-    pub subject: String,
+    /// ID of the user in the database
+    pub user_id: u32,
 }
 
 /// Retrieve auth cache from Rocket state
@@ -44,16 +40,75 @@ fn get_auth_cache<'r>(request: &'r Request<'_>) -> Result<&'r crate::fairings::A
     )
 }
 
+/// Retrieve DB from Rocket state
+fn get_db<'r>(request: &'r Request<'_>) -> Result<&'r crate::fairings::Database, ApiError> {
+    Ok(
+        request
+            .rocket()
+            .state()
+            .ok_or(
+                ApiError::new_internal_server_error()
+                    .with_description("Cannot retrieve DB from Rocket state")
+            )?
+    )
+}
+
+async fn lookup_or_make_user<'r>(request: &'r Request<'_>, token: &TokenInfo) -> Result<u32, ApiError> {
+    use entity::user::{Entity as UserEntity, Column as UserColumn, ActiveModel as UserActiveModel};
+
+    let auth_cache = get_auth_cache(request)?;
+    let mut model_cache = auth_cache
+        .user_model_cache
+        .write()
+        .await;
+
+    let user_id = match model_cache.get(token) {
+        Some(id) => *id,
+        None => {
+            let db = get_db(request)?;
+
+            let user = UserEntity::find()
+                .filter(UserColumn::JwtIssuer.eq(token.issuer.as_str()))
+                .filter(UserColumn::JwtSubject.eq(token.subject.as_str()))
+                .one(db.conn.as_ref())
+                .await
+                .map_err(|db_err| {
+                    ApiError::from(db_err)
+                })?;
+            match user {
+                Some(user) => {
+                    model_cache.insert(token.clone(), user.id);
+                    user.id
+                },
+                None => {
+                    let model = UserActiveModel {
+                        jwt_issuer: Set(token.issuer.clone()),
+                        jwt_subject: Set(token.subject.clone()),
+                        name: Set(None),
+                        ..Default::default()
+                    };
+                    let model = model
+                        .insert(db.conn.as_ref())
+                        .await
+                        .map_err(|db_err| {
+                            ApiError::from(db_err)
+                        })?;
+                    model.id
+                },
+            }
+        }
+    };
+
+    Ok(user_id)
+}
+
 /// Validate bearer and extract JWT information
-fn validate_bearer(request: &Request<'_>, bearer: &str) -> Result<TokenInfo, ApiError> {
+async fn validate_bearer(request: &Request<'_>, bearer: &str) -> Result<TokenInfo, ApiError> {
     let auth_cache = get_auth_cache(request)?;
     let mut key_cache = auth_cache
         .key_cache
         .write()
-        .map_err(|e| {
-            ApiError::new_internal_server_error()
-                .with_description(format!("Key cache lock poison error, {}", e.to_string()))
-        })?;
+        .await;
     let mut verifier = TokenVerifier::new(key_cache.deref_mut())
         .expect_audience(&auth_cache.expect_jwt_audience)
         .with_max_expiration(auth_cache.jwt_max_expiration);
@@ -103,13 +158,13 @@ impl<'r> FromRequest<'r> for Auth {
         if let Some(auth) = request.headers().get_one("Authorization") {
             if auth.starts_with("Bearer ") {
                 let token = &auth[7..];
-                match validate_bearer(request, token) {
-                    Ok(token) => Outcome::Success(
-                        Auth {
-                            issuer: token.issuer,
-                            subject: token.subject,
+                match validate_bearer(request, token).await {
+                    Ok(token) => {
+                        match lookup_or_make_user(request, &token).await {
+                            Ok(user_id) => Outcome::Success(Auth { user_id }),
+                            Err(err) => Outcome::Error(err.into()),
                         }
-                    ),
+                    },
                     Err(err) => Outcome::Error(err.into()),
                 }
             } else {

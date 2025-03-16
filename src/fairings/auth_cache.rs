@@ -5,11 +5,19 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/.
  */
-
+use std::collections::HashMap;
+use std::hash::Hash;
 use std::path::PathBuf;
-use std::sync::RwLock;
+use tokio::sync::RwLock;
 use rocket::fairing::AdHoc;
 use chrono::{DateTime, TimeDelta, Utc};
+
+/// JWT information
+#[derive(Clone, Eq, PartialEq)]
+pub struct TokenInfo {
+    pub issuer: String,
+    pub subject: String,
+}
 
 /// Rocket state for authentication cache
 pub struct AuthCache {
@@ -25,6 +33,8 @@ pub struct AuthCache {
     pub jwt_issued_after: Option<DateTime<Utc>>,
     /// Maximum expiration time
     pub jwt_max_expiration: TimeDelta,
+    /// User cache. Maps JWT information to user ID in database
+    pub user_model_cache: RwLock<HashMap<TokenInfo, u32>>,
 }
 
 /// Fairing for key cache
@@ -45,8 +55,16 @@ pub fn init(
                 expect_jwt_issuer,
                 jwt_issued_after,
                 jwt_max_expiration,
+                user_model_cache: RwLock::new(HashMap::new()),
             };
             rocket.manage(state)
         }
     )
+}
+
+impl Hash for TokenInfo {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.issuer.hash(state);
+        self.subject.hash(state);
+    }
 }

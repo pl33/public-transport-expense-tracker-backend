@@ -59,6 +59,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
                 ..rocket::Config::default()
             }
         )
+        .attach(fairings::db::init(cli.database.clone()))
         .attach(
             fairings::auth_cache::init(
                 cli.keys_dir.clone(),
@@ -72,6 +73,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
             "/api/v1/",
             openapi_get_routes![
                 routes::user::get,
+                routes::user::put,
             ]
         )
         .mount(
