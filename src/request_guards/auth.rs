@@ -22,9 +22,16 @@ use crate::fairings::auth_cache::TokenInfo;
 /// Request Guard for authentication. It investigates the Authorization HTTP header
 /// for a valid JWT. It looks up the user according to the Issuer and Subject fields
 /// in the database or creates a new user if there is no hit.
-pub struct Auth {
+pub struct Auth<Val: JwtValidator> {
+    jwt_validator: Val,
     /// ID of the user in the database
     pub user_id: u32,
+}
+
+/// Validate the JSON Web Token
+pub trait JwtValidator: Sized + Send {
+    /// Validate the claims of a JSON Web Token
+    fn validate(claims: &serde_json::Value) -> Result<Self, String>;
 }
 
 /// Retrieve auth cache from Rocket state
@@ -103,7 +110,10 @@ async fn lookup_or_make_user<'r>(request: &'r Request<'_>, token: &TokenInfo) ->
 }
 
 /// Validate bearer and extract JWT information
-async fn validate_bearer(request: &Request<'_>, bearer: &str) -> Result<TokenInfo, ApiError> {
+async fn validate_bearer(
+    request: &Request<'_>,
+    bearer: &str,
+) -> Result<(TokenInfo, serde_json::Value), ApiError> {
     let auth_cache = get_auth_cache(request)?;
     let mut key_cache = auth_cache
         .key_cache
@@ -135,11 +145,21 @@ async fn validate_bearer(request: &Request<'_>, bearer: &str) -> Result<TokenInf
                         .with_description("Subject is not set in token")
                 )?,
             };
+            let claims = serde_json::to_value(token.claims())
+                .map_err(
+                    |e| {
+                        ApiError::new_internal_server_error()
+                            .with_description(e.to_string())
+                    }
+                )?;
             Ok(
-                TokenInfo {
-                    issuer,
-                    subject,
-                }
+                (
+                    TokenInfo {
+                        issuer,
+                        subject,
+                    },
+                    claims,
+                )
             )
         },
         Err(err) => Err(
@@ -151,7 +171,7 @@ async fn validate_bearer(request: &Request<'_>, bearer: &str) -> Result<TokenInf
 }
 
 #[rocket::async_trait]
-impl<'r> FromRequest<'r> for Auth {
+impl<'r, Val: JwtValidator> FromRequest<'r> for Auth<Val> {
     type Error = ApiError;
 
     async fn from_request(request: &'r Request<'_>) -> Outcome<Self, Self::Error> {
@@ -159,10 +179,17 @@ impl<'r> FromRequest<'r> for Auth {
             if auth.starts_with("Bearer ") {
                 let token = &auth[7..];
                 match validate_bearer(request, token).await {
-                    Ok(token) => {
-                        match lookup_or_make_user(request, &token).await {
-                            Ok(user_id) => Outcome::Success(Auth { user_id }),
-                            Err(err) => Outcome::Error(err.into()),
+                    Ok((token, claims)) => {
+                        match Val::validate(&claims) {
+                            Ok(val) => match lookup_or_make_user(request, &token).await {
+                                Ok(user_id) => Outcome::Success(Auth { jwt_validator: val, user_id }),
+                                Err(err) => Outcome::Error(err.into()),
+                            },
+                            Err(e) => Outcome::Error(
+                                ApiError::new_unauthorized()
+                                    .with_description(e.to_string())
+                                    .into()
+                            )
                         }
                     },
                     Err(err) => Outcome::Error(err.into()),
@@ -184,7 +211,7 @@ impl<'r> FromRequest<'r> for Auth {
     }
 }
 
-impl OpenApiFromRequest<'_> for Auth {
+impl<Val: JwtValidator> OpenApiFromRequest<'_> for Auth<Val> {
     fn from_request_input(
         _gen: &mut OpenApiGenerator,
         _name: String,
@@ -215,5 +242,31 @@ impl OpenApiFromRequest<'_> for Auth {
                 ),
             )
         )
+    }
+}
+
+/// Validates that a token grants read-only access
+pub struct ReadOnly {}
+
+impl JwtValidator for ReadOnly {
+    fn validate(_claims: &serde_json::Value) -> Result<Self, String> {
+        Ok(ReadOnly {})
+    }
+}
+
+/// Validates that a token grants read and write access
+pub struct ReadWrite {}
+
+impl JwtValidator for ReadWrite {
+    fn validate(claims: &serde_json::Value) -> Result<Self, String> {
+        if let Some(flag) = claims["ptet:write"].as_bool() {
+            if flag {
+                Ok(ReadWrite {})
+            } else {
+                Err("ptet:write claim is false".to_string())
+            }
+        } else {
+            Err("No ptet:write claim in JWT".to_string())
+        }
     }
 }

@@ -9,3 +9,5 @@
 pub mod auth;
 
 pub use auth::Auth;
+pub use auth::ReadOnly;
+pub use auth::ReadWrite;
