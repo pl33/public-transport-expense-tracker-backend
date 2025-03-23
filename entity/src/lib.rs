@@ -7,3 +7,4 @@
  */
 
 pub mod user;
+pub mod ride;
