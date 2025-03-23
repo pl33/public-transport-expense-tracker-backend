@@ -8,3 +8,6 @@
 
 pub mod user;
 pub mod ride;
+pub mod ride_tag;
+pub mod tag_descriptor;
+pub mod tag_enum_option;

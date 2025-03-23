@@ -7,34 +7,30 @@
  */
 
 use sea_orm::entity::prelude::*;
-use serde::{Deserialize, Serialize};
 
-#[derive(Clone, Debug, Eq, PartialEq, DeriveEntityModel, Serialize, Deserialize, schemars::JsonSchema)]
-#[serde(rename = "User")]
-#[sea_orm(table_name = "user")]
+#[derive(Clone, Debug, PartialEq, DeriveEntityModel)]
+#[sea_orm(table_name = "tag_enum_option")]
 pub struct Model {
     #[sea_orm(primary_key)]
-    #[serde(skip_deserializing)]
     pub id: u32,
-    #[serde(skip_deserializing)]
-    pub jwt_issuer: String,
-    #[serde(skip_deserializing)]
-    pub jwt_subject: String,
+    pub created_at: DateTimeUtc,
+    pub updated_at: DateTimeUtc,
+    pub deleted_at: Option<DateTimeUtc>,
+    pub tag_descriptor_id: u32,
+    pub order: u32,
+    pub value: String,
+    pub uuid: Uuid,
     pub name: Option<String>,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
 pub enum Relation {
-    #[sea_orm(has_many = "super::ride::Entity")]
-    Ride,
-    #[sea_orm(has_many = "super::tag_descriptor::Entity")]
+    #[sea_orm(
+        belongs_to = "super::tag_descriptor::Entity",
+        from = "Column::TagDescriptorId",
+        to = "super::tag_descriptor::Column::Id"
+    )]
     TagDescriptor,
-}
-
-impl Related<super::ride::Entity> for Entity {
-    fn to() -> RelationDef {
-        Relation::Ride.def()
-    }
 }
 
 impl Related<super::tag_descriptor::Entity> for Entity {
