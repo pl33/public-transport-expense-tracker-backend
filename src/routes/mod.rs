@@ -8,6 +8,8 @@
 
 pub mod error;
 pub mod user;
+pub mod ride;
+pub mod ride_tag;
 pub mod tag;
 pub mod tag_option;
 

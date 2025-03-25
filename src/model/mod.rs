@@ -7,6 +7,8 @@
  */
 
 mod error;
+pub mod ride;
+pub mod ride_tag_link;
 pub mod tag;
 pub mod tag_option;
 
