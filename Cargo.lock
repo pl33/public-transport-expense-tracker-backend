@@ -2268,12 +2268,14 @@ dependencies = [
  "entity",
  "jwt_auth",
  "migration",
+ "rand 0.9.0",
  "rocket",
  "rocket_okapi",
  "sea-orm",
  "serde",
  "serde_json",
  "tokio",
+ "uuid",
 ]
 
 [[package]]

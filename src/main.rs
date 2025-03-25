@@ -8,6 +8,7 @@
 
 mod fairings;
 mod request_guards;
+mod model;
 mod routes;
 
 use std::error::Error;
@@ -74,6 +75,16 @@ async fn main() -> Result<(), Box<dyn Error>> {
             openapi_get_routes![
                 routes::user::get,
                 routes::user::put,
+                routes::tag::list,
+                routes::tag::post,
+                routes::tag::get,
+                routes::tag::put,
+                routes::tag::delete,
+                routes::tag_option::list,
+                routes::tag_option::post,
+                routes::tag_option::get,
+                routes::tag_option::put,
+                routes::tag_option::delete,
             ]
         )
         .mount(

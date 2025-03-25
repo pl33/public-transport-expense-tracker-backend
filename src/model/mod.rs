@@ -6,9 +6,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/.
  */
 
-pub mod error;
-pub mod user;
+mod error;
 pub mod tag;
 pub mod tag_option;
 
-pub use error::ApiError;
