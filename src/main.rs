@@ -26,9 +26,6 @@ use rocket_okapi::{
 #[derive(Parser)]
 #[command(version, about, long_about = None)]
 struct Cli {
-    /// Path to the keys
-    #[arg(short, long, default_value = "8080")]
-    port: u16,
     /// Database URI for SeaORM
     #[arg(short, long)]
     database: String,
@@ -54,12 +51,6 @@ async fn main() -> Result<(), Box<dyn Error>> {
     let cli = Cli::parse();
 
     rocket::build()
-        .configure(
-            rocket::Config{
-                port: cli.port,
-                ..rocket::Config::default()
-            }
-        )
         .attach(fairings::db::init(cli.database.clone()))
         .attach(
             fairings::auth_cache::init(
