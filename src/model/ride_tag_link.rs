@@ -199,6 +199,7 @@ pub async fn is_owner(
     db: &impl ConnectionTrait
 ) -> Result<(), CurdError> {
     let rows = ride_tag::Entity::find()
+        .find_also_related(ride::Entity)
         .filter(ride_tag::Column::Id.eq(link_id))
         .filter(ride_tag::Column::DeletedAt.is_null())
         .filter(ride::Column::UserId.eq(user_id))
