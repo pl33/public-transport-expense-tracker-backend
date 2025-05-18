@@ -346,8 +346,8 @@ impl CreateUpdateBuilder {
             .col_expr(ride_tag::Column::ValueDateTime, Expr::value(self.get_value_date_time()))
             .col_expr(ride_tag::Column::ValueEnumOptionId, Expr::value(self.get_value_enum_option_id()))
             .col_expr(ride_tag::Column::Remarks, Expr::value(self.remarks.clone()))
-            .filter(ride::Column::Id.eq(id))
-            .filter(ride::Column::DeletedAt.is_null())
+            .filter(ride_tag::Column::Id.eq(id))
+            .filter(ride_tag::Column::DeletedAt.is_null())
             .exec(db)
             .await
             .map_err(
