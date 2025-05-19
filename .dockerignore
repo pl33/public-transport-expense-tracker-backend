@@ -1,0 +1,14 @@
+*
+!/entity
+!/jwt_auth
+!/migration
+!/src
+!/test
+!/.dockerignore
+!/Cargo.lock
+!/Cargo.toml
+!/docker-compose.yml
+!/Dockerfile
+!/LICENSE
+
+*/target/

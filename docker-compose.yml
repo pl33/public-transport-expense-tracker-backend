@@ -1,0 +1,24 @@
+version: '3'
+
+services:
+  ptet:
+    image: ghcr.io/pl33/public-transport-expense-tracker-backend:latest
+    ports:
+      - "8000:8000"
+    command:
+      - "public-transport-expense-tracker"
+      - "--database"
+      - "sqlite:///data/db/sqlite3.db?mode=rwc"
+      - "--keys-dir"
+      - "/data/keys"
+      - "--server-base-uri"
+      - ${BASE_URI}
+      - "--expect-jwt-issuer"
+      - ${JWT_ISSUER}
+    environment:
+      ROCKET_ADDRESS: "0.0.0.0"
+      ROCKET_SECRET_KEY: "${SECRET_KEY}"
+    volumes:
+      - "./data/db/:/data/db"
+      - "./data/keys/:/data/keys:ro"
+    restart: unless-stopped
