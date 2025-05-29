@@ -8,11 +8,7 @@
 
 use serde::{Deserialize, Serialize};
 use rocket_okapi::okapi::schemars;
-use sea_orm::{
-    prelude::*,
-    Set,
-    NotSet,
-};
+use sea_orm::{prelude::*, Set, NotSet, QuerySelect};
 use entity::ride;
 use entity::ride_tag;
 use super::error::CurdError;
@@ -67,6 +63,44 @@ impl Ride {
             .find_with_related(ride_tag::Entity)
             .filter(ride::Column::UserId.eq(user_id))
             .filter(ride::Column::DeletedAt.is_null())
+            .all(db)
+            .await
+            .map_err(
+                |error| {
+                    CurdError::DbErr(error)
+                }
+            )?;
+        let mut result = Vec::with_capacity(models.len());
+        for (tag, options) in models {
+            result.push(Self::from_models(tag, options)?);
+        }
+        Ok(result)
+    }
+    
+    /// Count all instances belonging to [user_id].
+    pub async fn count_all(user_id: u32, db: &impl ConnectionTrait) -> Result<u64, CurdError> {
+        Ok(
+            ride::Entity::find()
+                .filter(ride::Column::UserId.eq(user_id))
+                .filter(ride::Column::DeletedAt.is_null())
+                .count(db)
+                .await
+                .map_err(
+                    |error| {
+                        CurdError::DbErr(error)
+                    }
+                )?
+        )
+    }
+
+    /// Fetch all instances belonging to [user_id]. Use pagination
+    pub async fn find_all_paginated(user_id: u32, db: &impl ConnectionTrait, page: u64, size: u64) -> Result<Vec<Self>, CurdError> {
+        let models = ride::Entity::find()
+            .find_with_related(ride_tag::Entity)
+            .filter(ride::Column::UserId.eq(user_id))
+            .filter(ride::Column::DeletedAt.is_null())
+            .offset(page * size)
+            .limit(size)
             .all(db)
             .await
             .map_err(

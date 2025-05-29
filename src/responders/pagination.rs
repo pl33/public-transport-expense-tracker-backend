@@ -10,6 +10,7 @@ use rocket::{Request, Response};
 use rocket::http::{ContentType, Header, Status};
 use rocket::response::Responder;
 use rocket_okapi::gen::OpenApiGenerator;
+use rocket_okapi::JsonSchema;
 use rocket_okapi::okapi::openapi3::Responses;
 use rocket_okapi::response::OpenApiResponderInner;
 
@@ -100,12 +101,52 @@ impl<'r, 'o: 'r, R: Responder<'r, 'o>> Responder<'r, 'o> for PaginatedResult<R> 
     }
 }
 
-impl<R> OpenApiResponderInner for PaginatedResult<R> {
-    fn responses(_gen: &mut OpenApiGenerator) -> rocket_okapi::Result<Responses> {
+impl<I: JsonSchema> OpenApiResponderInner for PaginatedResult<rocket::serde::json::Json<I>> {
+    fn responses(gen: &mut OpenApiGenerator) -> rocket_okapi::Result<Responses> {
+        use rocket_okapi::okapi::{map, openapi3::{RefOr, MediaType, Header, ParameterValue}};
+        let make_header = |description: &str| {
+            Header {
+                description: Some(description.to_string()),
+                required: false,
+                deprecated: false,
+                allow_empty_value: true,
+                value: ParameterValue::Content {
+                    content: map ! {},
+                },
+                extensions: Default::default(),
+            }
+        };
         Ok(Responses {
-            responses: rocket_okapi::okapi::map! {
-                // Note: 401 is already declared for ApiKey. so this is not essential.
-                // "401".to_owned() => RefOr::Object(unauthorized_response(gen)),
+            responses: map! {
+                "200".to_owned() => RefOr::Object(
+                    rocket_okapi::okapi::openapi3::Response {
+                        description: "".to_string(),
+                        content: map! {
+                            "application/json".to_owned() => MediaType {
+                                schema: Some(gen.json_schema::<I>()),
+                                ..Default::default()
+                            }
+                        },
+                        headers: map! {
+                            "X-Total-Items".to_owned() => RefOr::Object(
+                                make_header("Total number of items")
+                            ),
+                            "X-Page".to_owned() => RefOr::Object(
+                                make_header("Current page number")
+                            ),
+                            "X-Page-Size".to_owned() => RefOr::Object(
+                                make_header("Number of items on page")
+                            ),
+                            "X-Total-pages".to_owned() => RefOr::Object(
+                                make_header("Total number of pages")
+                            ),
+                            "Links".to_owned() => RefOr::Object(
+                                make_header("URL for preloading")
+                            ),
+                        },
+                        ..Default::default()
+                    }
+                ),
             },
             ..Default::default()
         })

@@ -15,16 +15,39 @@ use rocket_okapi::openapi;
 use super::ApiError;
 use crate::fairings::Database;
 use crate::request_guards::{Auth, ReadOnly, ReadWrite};
+use crate::responders::PaginatedResult;
 use crate::model::{ride, ride::Ride};
 
 #[openapi(tag = "Ride")]
-#[get("/ride")]
+#[get("/ride?<page>&<size>")]
 pub async fn list(
     auth: Auth<ReadOnly>,
     db: &State<Database>,
-) -> Result<Json<Vec<Ride>>, ApiError> {
-    let rides = Ride::find_all(auth.user_id, db.conn.as_ref()).await?;
-    Ok(Json(rides))
+    page: Option<u64>,
+    size: Option<u64>,
+) -> Result<PaginatedResult<Json<Vec<Ride>>>, ApiError> {
+    let count = Ride::count_all(auth.user_id, db.conn.as_ref()).await?;
+    if let Some(page) = page {
+        if let Some(size) = size {
+            if size > 0 {
+                let rides = Ride::find_all_paginated(auth.user_id, db.conn.as_ref(), page, size).await?;
+                Ok(PaginatedResult::new_paginated(Json(rides), count, page, size))
+            } else {
+                Err(
+                    ApiError::new_bad_request()
+                        .with_description("Page size must be greater than zero.")
+                )?
+            }
+        } else {
+            Err(
+                ApiError::new_bad_request()
+                    .with_description("Pagination requested and size is not defined")
+            )?
+        }
+    } else {
+        let rides = Ride::find_all(auth.user_id, db.conn.as_ref()).await?;
+        Ok(PaginatedResult::new_complete(Json(rides), Some(count)))
+    }
 }
 
 #[openapi(tag = "Ride")]
