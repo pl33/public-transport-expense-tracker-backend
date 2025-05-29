@@ -9,6 +9,7 @@
 mod fairings;
 mod request_guards;
 mod model;
+mod responders;
 mod routes;
 
 use std::error::Error;
