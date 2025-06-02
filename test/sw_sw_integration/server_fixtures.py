@@ -30,7 +30,7 @@ def create_token(tmpdir: Path, key_id: str, subject: str, write: bool):
         "-e",
         time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(time.time() + 86400)),
         "-a",
-        "http://localhost:8080",
+        "http://localhost:8000",
     ]
     if write:
         token_manager_base_args.append("--claims-json")
@@ -111,7 +111,7 @@ def dut():
                 "--keys-dir",
                 str(keys_root.absolute()),
                 "-u",
-                "http://localhost:8080",
+                "http://localhost:8000",
             ],
             cwd=str(tmpdir.absolute()),
             stdout=PIPE,
@@ -128,7 +128,7 @@ def dut():
         write_token_2 = create_token(tmpdir, key_id, "test2@example.tld", True)
 
         # Wait for heartbeat
-        base_url = "http://localhost:8080/api/v1"
+        base_url = "http://localhost:8000/api/v1"
         with httpx.Client(base_url=base_url, verify=True) as client:
             for step in range(10):
                 try:
