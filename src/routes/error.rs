@@ -107,11 +107,26 @@ impl<'r> rocket::response::Responder<'r, 'static> for ApiError {
 }
 
 impl OpenApiResponderInner for ApiError {
-    fn responses(_gen: &mut OpenApiGenerator) -> rocket_okapi::Result<Responses> {
+    fn responses(gen: &mut OpenApiGenerator) -> rocket_okapi::Result<Responses> {
+        use rocket_okapi::okapi::{map, openapi3::{RefOr, MediaType}};
+        let mut make_response = |description: &str| {
+            rocket_okapi::okapi::openapi3::Response {
+                description: description.to_string(),
+                content: map! {
+                    "application/json".to_owned() => MediaType {
+                        schema: Some(gen.json_schema::<ApiError>()),
+                        ..Default::default()
+                    }
+                },
+                ..Default::default()
+            }
+        };
         Ok(Responses {
-            responses: rocket_okapi::okapi::map! {
-                // Note: 401 is already declared for ApiKey. so this is not essential.
-                // "401".to_owned() => RefOr::Object(unauthorized_response(gen)),
+            responses: map! {
+                "400".to_owned() => RefOr::Object(make_response("Bad Request")),
+                "401".to_owned() => RefOr::Object(make_response("Unauthorized")),
+                "404".to_owned() => RefOr::Object(make_response("Not Found")),
+                "500".to_owned() => RefOr::Object(make_response("Internal Server Error")),
             },
             ..Default::default()
         })
