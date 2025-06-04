@@ -52,6 +52,21 @@ def test_create(api_config_dict, sample_rides):
     assert rides[0].is_template == sample_rides[0].is_template
 
 
+def test_list_paginated(api_config_dict, sample_rides):
+    for _ in range(20):
+        _ = routes_ride_post(sample_rides[0], api_config_dict["read_write"])
+
+    rides = routes_ride_list(page=0, size=5, api_config_override=api_config_dict["read"])
+    assert len(rides) == 5
+    for id, ride in enumerate(rides):
+        assert ride.id == id + 1
+
+    rides = routes_ride_list(page=2, size=4, api_config_override=api_config_dict["read"])
+    assert len(rides) == 4
+    for id, ride in enumerate(rides):
+        assert ride.id == id + 9
+
+
 def test_read(api_config_dict, sample_rides):
     created_ride = routes_ride_post(sample_rides[0], api_config_dict["read_write"])
     assert created_ride.id == 1
