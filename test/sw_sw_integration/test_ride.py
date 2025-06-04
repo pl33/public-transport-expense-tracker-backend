@@ -30,7 +30,7 @@ def sample_rides():
 
 
 def test_list(api_config_read):
-    rides = routes_ride_list(api_config_read)
+    rides = routes_ride_list(api_config_override=api_config_read)
     assert len(rides) == 0
 
 
@@ -42,7 +42,7 @@ def test_create(api_config_dict, sample_rides):
     assert created_ride.location_to == sample_rides[0].location_to
     assert created_ride.is_template == sample_rides[0].is_template
 
-    rides = routes_ride_list(api_config_dict["read"])
+    rides = routes_ride_list(api_config_override=api_config_dict["read"])
     assert len(rides) == 1
 
     assert rides[0].id == 1
@@ -74,7 +74,7 @@ def test_update(api_config_dict, sample_rides):
 
     routes_ride_put(1, sample_rides[1], api_config_dict["read_write"])
 
-    rides = routes_ride_list(api_config_dict["read"])
+    rides = routes_ride_list(api_config_override=api_config_dict["read"])
     assert len(rides) == 1
 
     assert rides[0].id == 1
@@ -99,7 +99,7 @@ def test_delete(api_config_dict, sample_rides):
 
     _ = routes_ride_get(2, api_config_dict["read"])
 
-    rides = routes_ride_list(api_config_dict["read"])
+    rides = routes_ride_list(api_config_override=api_config_dict["read"])
     assert len(rides) == 1
 
     assert rides[0].id == 2
@@ -112,7 +112,7 @@ def test_delete(api_config_dict, sample_rides):
 
 def test_list_unauthorized(api_config_unauthorized):
     with pytest.raises(HTTPException) as exc:
-        routes_ride_list(api_config_unauthorized)
+        routes_ride_list(api_config_override=api_config_unauthorized)
     assert exc.value.status_code == 401
 
 

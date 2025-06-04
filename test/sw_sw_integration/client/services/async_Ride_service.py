@@ -7,7 +7,9 @@ from ..api_config import APIConfig, HTTPException
 from ..models import *
 
 
-async def routes_ride_list(api_config_override: Optional[APIConfig] = None) -> List[Ride]:
+async def routes_ride_list(
+    page: Optional[int] = None, size: Optional[int] = None, api_config_override: Optional[APIConfig] = None
+) -> List[Ride]:
     api_config = api_config_override if api_config_override else APIConfig()
 
     base_path = api_config.base_path
@@ -17,7 +19,7 @@ async def routes_ride_list(api_config_override: Optional[APIConfig] = None) -> L
         "Accept": "application/json",
         "Authorization": f"Bearer { api_config.get_access_token() }",
     }
-    query_params: Dict[str, Any] = {}
+    query_params: Dict[str, Any] = {"page": page, "size": size}
 
     query_params = {key: value for (key, value) in query_params.items() if value is not None}
 
